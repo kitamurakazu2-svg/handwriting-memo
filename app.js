@@ -31,7 +31,7 @@ function point(event) { const r=canvas.getBoundingClientRect(); return {x:(event
 canvas.addEventListener('pointerdown', event => {
  if (busy || pointer !== null || (event.pointerType==='mouse' && event.button!==0)) return;
  event.preventDefault(); pointer=event.pointerId; canvas.setPointerCapture(pointer);
- current={erase:erasing,points:[point(event)]}; renderInk();
+ current={erase:erasing,points:[point(event)]};$('ink-status').textContent='';renderInk();
 });
 canvas.addEventListener('pointermove', event => {
  if (event.pointerId !== pointer || !current) return;
@@ -40,8 +40,16 @@ canvas.addEventListener('pointermove', event => {
 function finish(event) { if (event.pointerId!==pointer || !current) return; strokes.push(current); current=null; pointer=null; renderInk(); }
 canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish); canvas.addEventListener('lostpointercapture', finish);
 $('undo').onclick=()=>{strokes.pop();renderInk();};
-$('eraser').onclick=()=>{erasing=!erasing;$('eraser').setAttribute('aria-pressed',String(erasing));};
-$('clear').onclick=()=>{if(strokes.length && confirm('手書きエリアをすべて消しますか？')){strokes=[];renderInk();}};
+function setEraser(value){erasing=value;$('eraser').setAttribute('aria-pressed',String(value));$('eraser').textContent=value?'消しゴム ON':'消しゴム';}
+$('eraser').onclick=()=>{if(busy)return;setEraser(!erasing);$('ink-status').textContent=erasing?'消したい部分を指やペンでなぞってください。':'ペンに戻しました。';};
+$('clear').onclick=()=>{
+ if(busy)return;
+ if(!strokes.length && !current){$('ink-status').textContent='消去する手書きはありません。';return;}
+ if(!confirm('手書き内容をすべて消去しますか？本文と保存したメモは消えません。')){$('ink-status').textContent='消去をキャンセルしました。';return;}
+ const capturedPointer=pointer;strokes=[];current=null;pointer=null;
+ if(capturedPointer!==null && canvas.hasPointerCapture(capturedPointer))canvas.releasePointerCapture(capturedPointer);
+ setEraser(false);renderInk();$('ink-status').textContent='手書きを消去しました。';
+};
 function recognitionImage() {
  const {data}=ctx.getImageData(0,0,900,900); let left=900,top=900,right=-1,bottom=-1;
  for(let y=0;y<900;y++) for(let x=0;x<900;x++) if(data[(y*900+x)*4+3]>32){left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);}

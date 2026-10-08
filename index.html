@@ -13,7 +13,8 @@
 <section aria-labelledby="write-title" class="paper-section">
 <div class="section-heading"><h2 id="write-title">ここに、書く。</h2><span>横書き・大きめの文字で</span></div>
 <div class="canvas-wrap"><canvas id="ink" width="900" height="900" aria-label="手書き入力エリア。指またはペンで横書きしてください。"></canvas><span id="canvas-hint" aria-hidden="true">指やペンで、自由にどうぞ。</span></div>
-<div class="tools" role="group" aria-label="手書きの操作"><button id="undo" type="button">↶ 1つ戻す</button><button id="eraser" type="button" aria-pressed="false">消去</button><button id="clear" type="button">全消去</button></div>
+<div class="tools" role="group" aria-label="手書きの操作"><button id="undo" type="button">↶ 1つ戻す</button><button id="eraser" type="button" aria-pressed="false">消しゴム</button><button id="clear" type="button">消去</button></div>
+<p id="ink-status" class="status" role="status" aria-live="polite"></p>
 <button id="convert" class="primary" type="button">文字に変換 <span aria-hidden="true">→</span></button>
 <progress id="ocr-progress" max="100" aria-label="認識の進捗" hidden></progress>
 <p id="ocr-elapsed" class="status" hidden></p>

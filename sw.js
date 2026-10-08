@@ -1,4 +1,4 @@
-const CACHE='handwriting-memo-v2-ocr';
+const CACHE='handwriting-memo-v3-clear';
 const SHELL=['./','./index.html','./style.css','./app.js','./manifest.webmanifest','./icon.svg','./icon-192.png','./icon-512.png','./apple-touch-icon.png','./vendor/tesseract.min.js','./vendor/worker.min.js'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('handwriting-memo-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});

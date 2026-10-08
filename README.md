@@ -7,7 +7,7 @@
 ## 使い方
 
 1. 横書きで、文字を大きく、離して書きます。薄い罫線は目安で、認識画像には含みません。
-2. 「消去」で消しゴムを切り替え、「1つ戻す」で最後の描画・消去を取り消せます。「全消去」は手書きエリアだけを消します。
+2. 「消しゴム」で部分消去を切り替え、指やペンでなぞって消します。「1つ戻す」で最後の描画・部分消去を取り消せます。「消去」は確認後に手書き全体を消し、ペンモードに戻します。本文・保存済みメモは保持します。
 3. 「文字に変換」を押し、誤認識を本文欄で修正します。直接入力も可能です。
 4. 「保存」で本文と保存日時を保存します。保存成功後に本文と手書きを空にします。
 5. 保存したメモをタップすると全文と日時を表示します。削除は確認付きです。
@@ -20,7 +20,9 @@
 | --- | --- | --- |
 | Tesseract.js 6.0.1 + tessdata_best日本語モデル | Web WorkerとWebAssemblyで静的配信可能。現行Safari/Chromeが基盤APIに対応 | 無料・ローカル処理の試作として採用。ただしモデルは印刷文字向け |
 | Web Handwriting Recognition API | OS依存・提案中のAPI。Safari/Android両方で日本語認識できる共通実装を確認できない | 必須機能に採用しない |
-| Google ML Kit Digital Ink Recognition | 手書き向け。Android/iOSのネイティブSDKであり、Web用SDKではない | GitHub PagesのWebアプリには採用できない |
+| KanjiCanvas | JavaScriptだけで筆順・画数に依存しない一文字認識と候補提示。静的Webへ組み込み可能 | MITで無料。文章全体の一括変換には向かず、一文字ずつ書いて候補を選ぶUIが必要。実筆跡の精度は未評価 |
+| YomiToku軽量モデル | 日本語手書き対応。ブラウザ内WASM/WebGPU推論の公式デモあり | 非商用はCC BY-NC-SA 4.0で無料。商用は別ライセンス。独自アプリへの組み込み条件とスマホの速度・メモリ・精度を先に評価する必要あり |
+| Google ML Kit Digital Ink Recognition | 手書き向け。Android/iOSのネイティブSDKであり、Web用SDKではない | SDK・端末内認識は無料だがネイティブ化が必要。通常のiOS配布にはApple Developer Programの費用がかかる |
 | MyScript | 手書き向けだが商用サービス・契約が必要 | 有料APIを使わない条件に合わない |
 
 Tesseract.js公式FAQは、手書きは非対応、印刷字のような字以外は結果が悪く、設定変更で大幅改善できないと説明しています。tessdata_bestは日本語OCRの精度を優先する浮動小数点モデルですが、**手書き専用モデルではありません**。続け字、くずし字、縦書き、図、交差する文字、多様な筆跡には弱く、空の結果もあり得ます。ページを横書きブロックとして読み取り、筆跡の余白を切り取り白背景を付けます。これは手書き対応や高精度を意味しません。
@@ -29,10 +31,16 @@ Tesseract.js公式FAQは、手書きは非対応、印刷字のような字以�
 
 現在の無料・静的Web・両OS対応という条件で、高精度な日本語手書き認識を確認できた方式はありません。実際の筆跡を多数集めて精度評価し、必要なら手書き用モデルの研究やネイティブアプリ化を別途検討する必要があります。
 
+無料・ブラウザ維持を厳密に優先する場合はKanjiCanvasの一文字入力と候補選択を推奨します。今の複数文字の一括変換を維持する場合は、非商用用途を前提にYomiToku軽量モデルの小規模評価が候補です。これらは調査結果であり、利用者の承認前に認識方式や入力方式は変更していません。
+
 調査資料：
 
 - [Tesseract.js README](https://github.com/naptha/tesseract.js)
 - [公式FAQ：手書き非対応](https://github.com/naptha/tesseract.js/blob/master/docs/faq.md#is-handwritten-text-supported)
+- [KanjiCanvasの仕様・MITライセンス](https://github.com/asdfjkl/kanjicanvas)
+- [YomiTokuの手書き・ブラウザ対応とライセンス](https://github.com/kotaro-kinoshita/yomitoku/blob/main/README.md)
+- [ML Kit Digital Ink Recognition](https://developers.google.com/ml-kit/vision/digital-ink-recognition)
+- [Apple Developer Programの登録費用](https://developer.apple.com/jp/programs/enroll/)
 - [ローカル配信の仕様](https://github.com/naptha/tesseract.js/blob/master/docs/local-installation.md)
 - [tessdata_best](https://github.com/tesseract-ocr/tessdata_best)
 - [WICG手書き認識API提案：ML Kit・MyScript・Appleとの比較](https://github.com/WICG/handwriting-recognition/blob/main/explainer.md)
@@ -47,6 +55,12 @@ Tesseract.js公式FAQは、手書きは非対応、印刷字のような字以�
 - Tesseract.jsを変換時に読み込み、ライブラリ読み込み失敗後の再試行にも対応します。ファイルURLは`app.js`の配信ディレクトリを基準に解決するので、GitHub Pagesのサブパスや`index.html?from=home`でも同じ配置を参照します。
 - 日本語モデルは固定コミット・SHA-256検証を維持します。Service Workerのキャッシュは`handwriting-memo-v2-ocr`へ更新し、保存メモのキーは維持します。更新時はアプリのタブやホーム画面アプリをすべて閉じて開き直してください。
 - テストは実OCRに加え、置換確認のOK/キャンセル、ライブラリ・Worker・core・日本語データの404、破損データ、タイムアウト、空の結果、認識中のWorkerエラー、失敗後の再試行を確認します。GitHub Actionsでもテストに成功してから公開します。
+
+## 消去の修正（2026-10-08）
+
+「消去」と表示していたボタンは全消去ではなく消しゴムモードの切り替えでした。部分消去を「消しゴム」、確認後の全消去を「消去」に分け、モード・消去・キャンセル・空の入力の状態を画面に表示します。全消去は描画中の筆跡も破棄してポインター捕捉を解除し、ペンに戻します。本文と保存済みメモは保持します。Service Workerのキャッシュは`handwriting-memo-v3-clear`に更新しています。
+
+Chromiumで390px・412px幅のタッチ端末をエミュレーションし、連続タッチ描画、消去確認のOK/キャンセル、部分消去と取り消し、本文・保存メモの保持、再描画をテストします。描画途中のマウス操作からの全消去も確認します。iPhone/Androidの実機とiOS Safariでは未確認です。認識エンジンは利用者の承認まで変更しません。
 
 ## 構成とプライバシー
 
