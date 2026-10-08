@@ -1,7 +1,9 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const canvas = $('ink'), ctx = canvas.getContext('2d');
-let strokes = [], current = null, pointer = null, erasing = false, busy = false, worker = null, selected = null;
+let strokes = [], current = null, pointer = null, erasing = false, busy = false, selected = null;
+const appBase = new URL('./', document.currentScript.src);
+const OCR_TIMEOUT_MS = 180000;
 const storageKey = 'handwriting-memo:v1';
 let memos = [], storageReadable = true;
 try {
@@ -47,23 +49,79 @@ function recognitionImage() {
  const image=document.createElement('canvas');image.width=right-left+81;image.height=bottom-top+81;
  const c=image.getContext('2d');c.fillStyle='white';c.fillRect(0,0,image.width,image.height);c.drawImage(canvas,left,top,right-left+1,bottom-top+1,40,40,right-left+1,bottom-top+1);return image;
 }
-function setBusy(value){busy=value;for(const id of ['convert','eraser','clear','save'])$(id).disabled=value;$('text').readOnly=value;renderInk();$('convert').textContent=value?'認識しています…':'文字に変換 →';}
+function setBusy(value){busy=value;for(const id of ['convert','eraser','clear','save'])$(id).disabled=value;$('text').readOnly=value;canvas.setAttribute('aria-busy',String(value));$('undo').disabled=value || strokes.length===0;$('convert').textContent=value?'認識しています…':'文字に変換 →';}
+function loadOCRLibrary(signal) {
+ if(typeof window.Tesseract?.createWorker === 'function')return Promise.resolve();
+ const url=new URL('vendor/tesseract.min.js',appBase).href;
+ return new Promise((resolve,reject)=>{
+  const script=document.createElement('script');script.src=url;
+  const finish=error=>{signal.removeEventListener('abort',abort);script.onload=null;script.onerror=null;if(error){script.remove();reject(error);}else resolve();};
+  const abort=()=>finish(new Error('OCRライブラリの読み込みを中断しました。'));
+  script.onload=()=>finish(typeof window.Tesseract?.createWorker === 'function'?null:new Error(`Tesseract.jsの初期化に失敗しました: ${url}`));
+  script.onerror=()=>finish(new Error(`Tesseract.jsを読み込めません: ${url}`));
+  if(signal.aborted){abort();return;}
+  signal.addEventListener('abort',abort,{once:true});document.head.append(script);
+ });
+}
 $('convert').onclick=async()=>{
  if(current || busy)return;
- const image=recognitionImage();if(!image){$('ocr-status').textContent='まず手書きエリアに文字を書いてください。';return;}
+ let image;
+ try{image=recognitionImage();}catch(error){$('ocr-status').textContent=`認識用の画像を準備できません: ${error.message || String(error)}`;return;}
+ if(!image){$('ocr-status').textContent='まず手書きエリアに文字を書いてください。';return;}
  if($('text').value.trim() && !confirm('入力中の本文を認識結果で置き換えますか？'))return;
- setBusy(true);$('ocr-status').textContent='日本語の認識データを準備しています…';
+ setBusy(true);
+ let worker=null;
+ const controller=new AbortController();
+ const started=Date.now();let stage='OCRライブラリを読み込んでいます';
+ const showProgress=(label,progress)=>{
+  stage=label;$('ocr-status').textContent=label+'…';$('ocr-progress').hidden=false;
+  if(Number.isFinite(progress)){$('ocr-progress').value=Math.round(Math.max(0,Math.min(1,progress))*100);$('ocr-status').textContent+=` ${$('ocr-progress').value}%`;}
+  else $('ocr-progress').removeAttribute('value');
+ };
+ const labels={
+  'loading tesseract core':'認識エンジンを読み込んでいます',
+  'initializing tesseract':'認識エンジンを初期化しています',
+  'loading language traineddata':'日本語の認識データを読み込んでいます',
+  'initializing api':'日本語の認識データを初期化しています',
+  'recognizing text':'文字を読み取っています',
+ };
+ let timeout;
+ const deadline=new Promise((_,reject)=>{timeout=setTimeout(()=>{
+  reject(new Error('認識が180秒以内に完了しませんでした。通信状態や端末の空きメモリを確認して再試行してください。'));
+  controller.abort();
+ },OCR_TIMEOUT_MS);});
+ $('ocr-elapsed').hidden=false;$('ocr-elapsed').textContent='開始から 0秒（最大180秒）';
+ const ticker=setInterval(()=>$('ocr-elapsed').textContent=`開始から ${Math.floor((Date.now()-started)/1000)}秒（最大180秒）`,1000);
+ showProgress(stage);
  try {
-  if(!window.Tesseract)throw new Error('OCR library unavailable');
-  if(!worker){const base=new URL('./vendor/',location.href);worker=await Tesseract.createWorker('jpn',1,{
-   workerPath:new URL('worker.min.js',base).href,corePath:new URL('core/',base).href,langPath:new URL('lang/',base).href,workerBlobURL:false,
-   logger:message=>{if(message.status==='recognizing text')$('ocr-status').textContent=`文字を読み取っています… ${Math.round(message.progress*100)}%`;},
-  });await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});}
-  const result=await worker.recognize(image);const text=result.data.text.trim();
-  if(!text){$('ocr-status').textContent='文字を読み取れませんでした。横書きで、文字を離して大きく書くか、本文を直接入力してください。';return;}
-  $('text').value=text;$('ocr-status').textContent='変換しました。誤字を確認してから保存してください。';
- }catch(error){console.error('OCR failed',error);if(worker){await worker.terminate().catch(()=>{});worker=null;}$('ocr-status').textContent='認識に失敗しました。初回は通信が必要です。通信状態や端末の空きメモリを確認し、もう一度お試しください。本文の直接入力もできます。';}
- finally{setBusy(false);}
+  const recognize=async()=>{
+   await loadOCRLibrary(controller.signal);
+   showProgress('認識Workerを起動しています');
+   const base=new URL('vendor/',appBase);
+   worker=await Tesseract.createWorker('jpn',1,{
+    workerPath:new URL('worker.min.js',base).href,corePath:new URL('core/',base).href,langPath:new URL('lang/',base).href,
+    workerBlobURL:false,gzip:true,signal:controller.signal,
+    logger:message=>{if(!controller.signal.aborted)showProgress(labels[message.status] || '認識を準備しています',message.progress);},
+    errorHandler:error=>console.error('OCR Worker failed',error),
+   });
+   if(controller.signal.aborted){await worker.terminate();worker=null;throw new Error('認識を中断しました。');}
+   await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});
+   showProgress('文字を読み取っています',0);
+   return worker.recognize(image);
+  };
+  const result=await Promise.race([recognize(),deadline]);const text=result.data.text.trim();
+  if(!text){$('ocr-progress').hidden=true;$('ocr-status').textContent='認識は完了しましたが、文字を読み取れませんでした。横書きで、文字を離して大きく書くか、本文を直接入力してください。本文は変更していません。';return;}
+  $('text').value=text;$('ocr-progress').value=100;$('ocr-status').textContent='変換しました。誤字を確認してから保存してください。';
+ }catch(error){
+  console.error('OCR failed',stage,error);$('ocr-progress').hidden=true;
+  const detail=error?.message || String(error);
+  $('ocr-status').textContent=`認識に失敗しました（${stage}）。エラー: ${detail} 本文は変更していません。初回は通信が必要です。通信状態を確認して「文字に変換」で再試行してください。`;
+ }finally{
+  clearTimeout(timeout);clearInterval(ticker);
+  if(worker){await worker.terminate().catch(()=>{});worker=null;}
+  controller.abort();
+  $('ocr-elapsed').textContent=`処理時間 ${Math.floor((Date.now()-started)/1000)}秒`;setBusy(false);
+ }
 };
 const formatDate = date => new Date(date).toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
 function persist(next){if(!storageReadable)return false;try{localStorage.setItem(storageKey,JSON.stringify(next));memos=next;return true;}catch{$('save-status').textContent='保存できませんでした。端末の空き容量やブラウザの保存設定を確認してください。本文はそのまま残しています。';return false;}}
@@ -71,7 +129,7 @@ function renderMemos(){const list=$('memo-list');list.replaceChildren();$('memo-
  if(!memos.length){const p=document.createElement('p');p.className='empty';p.textContent='まだメモはありません。最初のひとことを残しましょう。';list.append(p);}
  for(const memo of memos){const b=document.createElement('button');b.className='memo-card';b.type='button';const time=document.createElement('time');time.dateTime=memo.date;time.textContent=formatDate(memo.date);const p=document.createElement('p');p.textContent=memo.text;b.append(time,p);b.onclick=()=>{selected=memo.id;$('detail-date').textContent=formatDate(memo.date);$('detail-text').textContent=memo.text;$('memo-dialog').showModal();};list.append(b);}
 }
-$('save').onclick=()=>{const text=$('text').value.trim();if(!text){$('save-status').textContent='保存する本文を入力してください。';return;}const memo={id:crypto.randomUUID(),text,date:new Date().toISOString()};if(persist([memo,...memos])){$('text').value='';strokes=[];renderInk();renderMemos();$('save-status').textContent='この端末に保存しました。';$('ocr-status').textContent='';}};
+$('save').onclick=()=>{const text=$('text').value.trim();if(!text){$('save-status').textContent='保存する本文を入力してください。';return;}const memo={id:crypto.randomUUID(),text,date:new Date().toISOString()};if(persist([memo,...memos])){$('text').value='';strokes=[];renderInk();renderMemos();$('save-status').textContent='この端末に保存しました。';$('ocr-status').textContent='';$('ocr-progress').hidden=true;$('ocr-elapsed').hidden=true;}};
 $('close-dialog').onclick=()=>$('memo-dialog').close();
 $('delete-memo').onclick=()=>{if(confirm('このメモを削除しますか？この操作は元に戻せません。') && persist(memos.filter(m=>m.id!==selected))){$('memo-dialog').close();renderMemos();$('save-status').textContent='メモを削除しました。';}};
 renderInk();renderMemos();

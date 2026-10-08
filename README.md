@@ -38,11 +38,21 @@ Tesseract.js公式FAQは、手書きは非対応、印刷字のような字以�
 - [WICG手書き認識API提案：ML Kit・MyScript・Appleとの比較](https://github.com/WICG/handwriting-recognition/blob/main/explainer.md)
 - [WebAssemblyの対応表](https://caniuse.com/wasm)
 
+## OCRの不具合修正（2026-10-08）
+
+日本語モデルを404にすると、置換確認でOKを押した後も「日本語の認識データを準備しています…」のままボタンが無効になる問題を再現しました。Tesseract.js 6.0.1の`createWorker`が`loadLanguage`/`initialize`の失敗を握りつぶして開始待ちのPromiseをrejectしないことが原因です。通常配信の日本語OCR・手書きサンプル・オフライン変換は修正前にも成功しました。利用者の端末で発生した具体的な通信エラーは、旧画面に詳細表示がないため断定できません。
+
+- 初期化とWorker内のエラーを呼び出し元へ返し、失敗・完了時にはWorkerを終了します。180秒のタイムアウトで停止した読み込みも中断し、再試行できます。
+- ライブラリ、エンジン、日本語データ、初期化、認識の各段階と進捗率・経過時間を表示します。失敗時は段階とエラー詳細を表示し、既存の本文・筆跡を保持します。
+- Tesseract.jsを変換時に読み込み、ライブラリ読み込み失敗後の再試行にも対応します。ファイルURLは`app.js`の配信ディレクトリを基準に解決するので、GitHub Pagesのサブパスや`index.html?from=home`でも同じ配置を参照します。
+- 日本語モデルは固定コミット・SHA-256検証を維持します。Service Workerのキャッシュは`handwriting-memo-v2-ocr`へ更新し、保存メモのキーは維持します。更新時はアプリのタブやホーム画面アプリをすべて閉じて開き直してください。
+- テストは実OCRに加え、置換確認のOK/キャンセル、ライブラリ・Worker・core・日本語データの404、破損データ、タイムアウト、空の結果、認識中のWorkerエラー、失敗後の再試行を確認します。GitHub Actionsでもテストに成功してから公開します。
+
 ## 構成とプライバシー
 
 HTML / CSS / JavaScriptのみ。フレームワークやバックエンドはありません。キャンバスの筆跡だけを白背景画像にしてOCRします。メモや筆跡は外部に送信せず、認識も端末内で実行します。
 
-ビルド時にnpmからTesseract.jsを導入し、固定コミットの日本語モデルをGitHubから取得してSHA-256を検証します。`dist/vendor`にエンジンとモデルをコピーするので、利用時に外部CDNやAPIへの接続は不要です。日本語モデルは圧縮前約14 MBで、初回は同一サイトからエンジンとモデルのダウンロードが必要です。スマホでは読み込みと認識に時間がかかり、古い端末ではメモリ不足になる可能性があります。
+ビルド時にnpmからTesseract.jsを導入し、固定コミットの日本語モデルをGitHubから取得してSHA-256を検証します。Tesseract.js 6.0.1の初期化エラーが未完了になる経路を、`scripts/bundle-ocr.mjs`の検証付きソースパッチで修正し、esbuildでブラウザ用にバンドルします。`dist/vendor`にエンジンとモデルを同梱するので、利用時に外部CDNやAPIへの接続は不要です。日本語モデルは圧縮前約14 MBで、初回は同一サイトからエンジンとモデルのダウンロードが必要です。スマホでは読み込みと認識に時間がかかり、古い端末ではメモリ不足になる可能性があります。
 
 ## 開発・確認
 
@@ -72,7 +82,7 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium npm test
 2. GitHubの **Settings → Pages → Build and deployment → Source** を **GitHub Actions** にします。
 3. `Deploy GitHub Pages`ワークフローが`dist`をビルドして公開します。手動実行も可能です。
 
-すべて相対パスで、`/handwriting-memo/`などのプロジェクトサイトに対応します。公開操作はこの実装作業では実行していません。
+すべて相対パスで、`/handwriting-memo/`などのプロジェクトサイトに対応します。mainへのpushでテストを実行し、成功した場合に再デプロイします。
 
 ## PWAとオフライン
 

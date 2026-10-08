@@ -24,6 +24,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
+      - name: Install test browser
+        run: npx playwright install --with-deps chromium
+      - name: Test Japanese OCR and error recovery
+        run: npm test
       - name: Verify Pages entry point
         run: test -s dist/index.html
       - uses: actions/configure-pages@v5

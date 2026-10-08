@@ -1,2 +1,3 @@
+const {existsSync}=require('node:fs');
 const {defineConfig}=require('@playwright/test');
-module.exports=defineConfig({testDir:'./tests',timeout:180000,workers:1,use:{baseURL:'http://127.0.0.1:4173/handwriting-memo/',viewport:{width:390,height:844},launchOptions:{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || '/usr/bin/chromium',args:['--no-sandbox']}},webServer:{command:'python3 scripts/test-server.py',port:4173,reuseExistingServer:false}});
+module.exports=defineConfig({testDir:'./tests',timeout:180000,workers:1,use:{baseURL:'http://127.0.0.1:4173/handwriting-memo/',viewport:{width:390,height:844},launchOptions:{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined),args:['--no-sandbox']}},webServer:{command:'python3 scripts/test-server.py',port:4173,reuseExistingServer:false}});

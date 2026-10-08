@@ -43,3 +43,17 @@ test('stroke-only Japanese sample passes through canvas OCR',async({page})=>{
  for(const stroke of strokes){await page.mouse.move(r.x+stroke[0][0]/900*r.width,r.y+stroke[0][1]/900*r.height);await page.mouse.down();for(const [x,y] of stroke.slice(1))await page.mouse.move(r.x+x/900*r.width,r.y+y/900*r.height,{steps:8});await page.mouse.up();}
  await page.locator('#convert').click();await expect(page.locator('#ocr-status')).toContainText('変換しました',{timeout:150000});await expect(page.locator('#text')).toHaveValue('日本');
 });
+test('updated service worker removes obsolete OCR cache and keeps saved notes',async({page})=>{
+ await page.goto('./');await page.evaluate(()=>navigator.serviceWorker.ready);
+ await page.locator('#text').fill('更新後も残すメモ');await page.locator('#save').click();
+ await page.evaluate(async()=>{
+  const registration=await navigator.serviceWorker.getRegistration();await registration.unregister();
+  const old=await caches.open('handwriting-memo-v1');await old.put('./app.js',new Response('obsolete OCR code'));
+  await caches.open('unrelated-app-cache');
+ });
+ await page.reload();await page.evaluate(()=>navigator.serviceWorker.ready);
+ await expect.poll(()=>page.evaluate(async()=>!(await caches.keys()).includes('handwriting-memo-v1'))).toBe(true);
+ expect(await page.evaluate(()=>caches.keys())).toContain('unrelated-app-cache');
+ await expect(page.locator('#memo-count')).toHaveText('1件');await page.locator('.memo-card').click();
+ await expect(page.locator('#detail-text')).toHaveText('更新後も残すメモ');
+});

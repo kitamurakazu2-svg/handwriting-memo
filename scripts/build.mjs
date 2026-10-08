@@ -1,3 +1,4 @@
+import { bundleOCR } from './bundle-ocr.mjs';
 import { mkdir, copyFile, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
@@ -8,7 +9,8 @@ for (const file of ['index.html','style.css','app.js','sw.js','manifest.webmanif
 await rm(new URL('vendor/core/',out),{recursive:true,force:true});
 await mkdir(new URL('vendor/core/',out),{recursive:true});
 await mkdir(new URL('vendor/lang/',out),{recursive:true});
-for (const file of ['tesseract.min.js','worker.min.js']) await copyFile(`node_modules/tesseract.js/dist/${file}`, new URL('vendor/'+file,out));
+await bundleOCR(new URL('vendor/tesseract.min.js',out).pathname);
+for (const file of ['worker.min.js']) await copyFile(`node_modules/tesseract.js/dist/${file}`, new URL('vendor/'+file,out));
 for (const file of await readdir('node_modules/tesseract.js-core')) if (file.endsWith('.wasm') || file.endsWith('.wasm.js')) await copyFile('node_modules/tesseract.js-core/'+file,new URL('vendor/core/'+file,out));
 const modelUrl='https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/jpn.traineddata';
 const modelFile=new URL('vendor/lang/jpn.traineddata.gz',out);
