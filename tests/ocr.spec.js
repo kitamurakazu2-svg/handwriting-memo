@@ -62,6 +62,9 @@ test('stalled startup times out, releases Worker and permits retry',async({page}
  let pending;await page.route('**/jpn.traineddata.gz',r=>{pending=r;});
  await prepare(page);await page.clock.install();await convert(page);
  await expect(page.locator('#ocr-status')).toContainText('日本語の認識データを読み込んでいます');
+ // Worker progress arrives before the asynchronous cache lookup starts fetch.
+ // Wait for the intercepted request before advancing the main-page clock.
+ await expect.poll(()=>Boolean(pending)).toBe(true);
  await page.clock.fastForward(180001);await failure(page,'180秒');
  await pending.abort();await page.unroute('**/jpn.traineddata.gz');await page.clock.resume();await convert(page);
  await expect(page.locator('#ocr-status')).toContainText('変換しました',{timeout:150000});
