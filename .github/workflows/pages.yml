@@ -24,9 +24,16 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
+      - name: Verify Pages entry point
+        run: test -s dist/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Report published URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          printf '## GitHub Pages\n\nPublished URL: %s\n\nEntry point: dist/index.html\n' "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"
