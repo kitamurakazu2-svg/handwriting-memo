@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ee"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="指で書いて、文字にして、端末に残す。自分だけの手書きメモ。">
+<title>手書きメモ</title><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg"><link rel="apple-touch-icon" href="./apple-touch-icon.png"><link rel="stylesheet" href="./style.css">
+<script defer src="./vendor/tesseract.min.js"></script><script defer src="./app.js"></script>
+</head>
+<body>
+<main>
+<header><div><span class="eyebrow">わたしの小さなノート</span><h1>手書きメモ<span class="logo-mark" aria-hidden="true">✎</span></h1></div><span class="private-badge">端末に保存</span></header>
+<section aria-labelledby="write-title" class="paper-section">
+<div class="section-heading"><h2 id="write-title">ここに、書く。</h2><span>横書き・大きめの文字で</span></div>
+<div class="canvas-wrap"><canvas id="ink" width="900" height="900" aria-label="手書き入力エリア。指またはペンで横書きしてください。"></canvas><span id="canvas-hint" aria-hidden="true">指やペンで、自由にどうぞ。</span></div>
+<div class="tools" role="group" aria-label="手書きの操作"><button id="undo" type="button">↶ 1つ戻す</button><button id="eraser" type="button" aria-pressed="false">消去</button><button id="clear" type="button">全消去</button></div>
+<button id="convert" class="primary" type="button">文字に変換 <span aria-hidden="true">→</span></button>
+<p id="ocr-status" class="status" role="status" aria-live="polite"></p>
+<p class="note">認識は試験機能です。くずし字や続け字は誤認識しやすいため、結果を直して保存してください。初回は認識データの読み込みに時間がかかります。</p>
+</section>
+<section class="editor" aria-labelledby="edit-title"><div class="section-heading"><h2 id="edit-title">文字を整える</h2><span>直接入力もできます</span></div><label class="sr-only" for="text">メモの本文</label><textarea id="text" placeholder="変換した文字がここに表示されます。" rows="5"></textarea><button id="save" class="primary" type="button">保存</button><p id="save-status" role="status" class="status"></p></section>
+<section aria-labelledby="memo-title"><div class="section-heading"><h2 id="memo-title">保存したメモ</h2><span id="memo-count">0件</span></div><div id="memo-list"></div></section>
+<footer><p>メモはこのブラウザだけに保存されます。<br>履歴・サイトデータの削除や端末変更で失われます。</p><details><summary>ホーム画面に追加する</summary><p>iPhone：Safariの共有ボタン →「ホーム画面に追加」。<br>Android：Chromeのメニュー →「ホーム画面に追加」または「アプリをインストール」。</p></details><p id="offline-status" role="status"></p></footer>
+</main>
+<dialog id="memo-dialog"><div class="dialog-heading"><h2>メモ</h2><button id="close-dialog" type="button" aria-label="閉じる">閉じる</button></div><time id="detail-date"></time><p id="detail-text"></p><button id="delete-memo" class="danger" type="button">このメモを削除</button></dialog>
+</body></html>

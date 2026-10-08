@@ -1,0 +1,16 @@
+{
+  "name": "handwriting-memo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "python3 -m http.server 4173 --directory dist",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "tesseract.js": "6.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2"
+  }
+}
